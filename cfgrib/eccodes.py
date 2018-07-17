@@ -580,7 +580,7 @@ def codes_get_api_version():
 def codes_new_from_samples(samplename, product_kind):
     # type: (bytes, int) -> cffi.FFI.CData
     if product_kind != CODES_PRODUCT_GRIB:
-        raise NotImplemented("Support implemented only for GRIB.")
+        raise NotImplementedError("Support implemented only for GRIB.")
     return lib.codes_grib_handle_new_from_samples(ffi.NULL, samplename)
 
 
@@ -605,7 +605,7 @@ def codes_set_string(msgid, key, value):
 
 def codes_set(msgid, key, value):
     """"""
-    if isinstance(value, (int, np.integer)):
+    if isinstance(value, int):
         codes_set_long(msgid, key, value)
     elif isinstance(value, float):
         codes_set_double(msgid, key, value)
@@ -629,7 +629,7 @@ def codes_set_array(msgid, key, values):
         if isinstance(values[0], float):
             codes_set_double_array(msgid, key, values)
         else:
-            raise NotImplemented
+            raise NotImplementedError
     else:
         raise ValueError("Cannot provide an empty list.")
 
