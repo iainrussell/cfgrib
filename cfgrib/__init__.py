@@ -15,8 +15,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from .cfcoords import translate
 from .dataset import Dataset
 from .eccodes import EcCodesError
 from .messages import Stream
 
-__all__ = ['Dataset', 'EcCodesError', 'Stream']
+__all__ = ['Dataset', 'EcCodesError', 'Stream', 'translate']

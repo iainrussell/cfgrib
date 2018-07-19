@@ -25,8 +25,9 @@ import attr
 from xarray import Variable
 from xarray.core import indexing
 from xarray.core.utils import FrozenOrderedDict
-from xarray.backends.api import open_dataset as _open_dataset
-from xarray.backends.common import AbstractDataStore, BackendArray
+from xarray.backends.api import open_dataset as _open_dataset, _validate_dataset_names, _validate_attrs
+
+from xarray.backends.common import AbstractDataStore, BackendArray, AbstractWritableDataStore
 
 import cfgrib
 
@@ -152,6 +153,35 @@ def open_dataset(path, flavour_name='ecmwf', **kwargs):
             overrides[k] = kwargs.pop(k)
     store = GribDataStore.frompath(path, flavour_name=flavour_name, **overrides)
     return _open_dataset(store, **kwargs)
+
+
+@attr.attrs()
+class WriteGribDataStore(AbstractWritableDataStore):
+    path = attr.attrib()
+    mode = attr.attrib()
+
+    def store(self, variables, attributes, check_encoding_set=frozenset(), unlimited_dims=None):
+        pass
+
+    def sync(self, compute=True):
+        pass
+
+    def close(self):
+        pass
+
+
+def to_grib(dataset, path, mode='w'):
+
+    # validate Dataset keys, DataArray names, and attr keys/values
+    _validate_dataset_names(dataset)
+    _validate_attrs(dataset)
+
+    store = WriteGribDataStore(path=path, mode=mode)
+
+    ecmwf_dataset = cfgrib.translate(dataset)
+    # this transformation is missing
+    eccodes_dataset = ecmwf_dataset
+    eccodes_dataset.dump_to_store(store)
 
 
 def cfgrib2netcdf():
