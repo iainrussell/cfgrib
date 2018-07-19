@@ -34,7 +34,7 @@ _MARKER = object()
 
 
 @attr.attrs()
-class Message(collections.Mapping):
+class Message(collections.MutableMapping):
     """Dictionary-line interface to access Message headers."""
     codes_id = attr.attrib()
     encoding = attr.attrib(default='ascii', type=str)
@@ -43,7 +43,7 @@ class Message(collections.Mapping):
     def fromfile(cls, file, offset=None, **kwargs):
         if offset is not None:
             file.seek(offset)
-        codes_id = eccodes.codes_new_from_file(file, eccodes.CODES_PRODUCT_GRIB)
+        codes_id = eccodes.codes_handle_new_from_file(file)
         if codes_id is None:
             raise EOFError("end-of-file reached.")
         return cls(codes_id=codes_id, **kwargs)
@@ -71,6 +71,19 @@ class Message(collections.Mapping):
             return values[0]
         return values
 
+    def message_set(self, item, value):
+        # type: (str, T.Any, bool) -> None
+        key = item.encode(self.encoding)
+        set_array = isinstance(value, T.Sequence) and not isinstance(value, (str, bytes))
+        if set_array:
+            if value and isinstance(value[0], str):
+                value = [v.decode(self.encoding) for v in value]
+            eccodes.codes_set_array(self.codes_id, key, value)
+        else:
+            if isinstance(value, str):
+                value = value.decode(self.encoding)
+            eccodes.codes_set(self.codes_id, key, value)
+
     def message_iterkeys(self, namespace=None):
         # type: (str) -> T.Generator[str, None, None]
         if namespace is not None:
@@ -85,6 +98,13 @@ class Message(collections.Mapping):
     def __getitem__(self, item):
         # type: (str) -> T.Any
         return self.message_get(item)
+
+    def __setitem__(self, item, value):
+        # type: (str, T.Any) -> None
+        return self.message_set(item, value)
+
+    def __delitem__(self, item):
+        raise NotImplementedError
 
     def __iter__(self):
         # type: () -> T.Generator[str, None, None]
