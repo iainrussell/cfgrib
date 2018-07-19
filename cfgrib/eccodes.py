@@ -162,12 +162,6 @@ def codes_handle_new_from_file(fileobj, product_kind=CODES_PRODUCT_GRIB):
         raise
 
 
-def codes_new_from_file(fileobj, product_kind=CODES_PRODUCT_GRIB):
-    if product_kind == lib.PRODUCT_GRIB:
-        return codes_handle_new_from_file(fileobj, product_kind)
-    raise Exception("Invalid product kind: %r" % product_kind)
-
-
 codes_index_delete = lib.codes_index_delete
 codes_handle_delete = lib.codes_handle_delete
 
@@ -577,7 +571,7 @@ def codes_get_api_version():
     return "%d.%d.%d" % (major, minor, patch)
 
 
-def codes_new_from_samples(samplename, product_kind):
+def codes_new_from_samples(samplename, product_kind=CODES_PRODUCT_GRIB):
     # type: (bytes, int) -> cffi.FFI.CData
     if product_kind != CODES_PRODUCT_GRIB:
         raise NotImplementedError("Support implemented only for GRIB.")
