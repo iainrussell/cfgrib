@@ -77,11 +77,11 @@ class Message(collections.MutableMapping):
         set_array = isinstance(value, T.Sequence) and not isinstance(value, (str, bytes))
         if set_array:
             if value and isinstance(value[0], str):
-                value = [v.decode(self.encoding) for v in value]
+                value = [v.encode(self.encoding) for v in value]
             eccodes.codes_set_array(self.codes_id, key, value)
         else:
             if isinstance(value, str):
-                value = value.decode(self.encoding)
+                value = value.encode(self.encoding)
             eccodes.codes_set(self.codes_id, key, value)
 
     def message_iterkeys(self, namespace=None):
