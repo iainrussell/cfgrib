@@ -20,8 +20,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
+import itertools
+import logging
+import typing as T
 
 import attr
+import xarray as xr
 from xarray import Variable
 from xarray.core import indexing
 from xarray.core.utils import FrozenOrderedDict
@@ -30,6 +34,11 @@ from xarray.backends.api import open_dataset as _open_dataset, _validate_dataset
 from xarray.backends.common import AbstractDataStore, BackendArray, AbstractWritableDataStore
 
 import cfgrib
+from . import dataset
+from . import messages
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class WrapGrib(BackendArray):
@@ -155,33 +164,77 @@ def open_dataset(path, flavour_name='ecmwf', **kwargs):
     return _open_dataset(store, **kwargs)
 
 
-@attr.attrs()
-class WriteGribDataStore(AbstractWritableDataStore):
-    path = attr.attrib()
-    mode = attr.attrib()
+def eccodes_dataarray_to_grib(file, data_var, global_attributes={}):
+    # type: (T.BinaryIO, str, xr.DataArray) -> None
+    grib_attributes = {k[5:]: v for k, v in global_attributes.items() if k[:5] == 'GRIB_'}
+    grib_attributes.update({k[5:]: v for k, v in data_var.attrs.items() if k[:5] == 'GRIB_'})
 
-    def store(self, variables, attributes, check_encoding_set=frozenset(), unlimited_dims=None):
-        pass
+    header_coords_names = []
 
-    def sync(self, compute=True):
-        pass
+    if grib_attributes['gridType'] == 'regular_ll':
+        geography = 'regular_ll'
+        header_coords_names += [n for n, _ in dataset.DATA_TIME_COORDINATE_MAP]
+    else:
+        raise NotImplementedError("Unsupported 'gridType': %r" % grib_attributes['gridType'])
 
-    def close(self):
-        pass
+    if grib_attributes['typeOfLevel'] == 'isobaricInhPa':
+        vertical = 'pl'
+        header_coords_names += [n for n, _ in dataset.VERTICAL_COORDINATE_MAP]
+    elif grib_attributes['typeOfLevel'] in ('surface', 'meanSea'):
+        vertical = 'sfc'
+    else:
+        raise NotImplementedError("Unsupported 'typeOfLevel': %r" % grib_attributes['typeOfLevel'])
+
+    sample_name = '%s_%s_grib2' % (geography, vertical)
+
+    header_coords_values = [data_var.coords[name].values.tolist() for name in header_coords_names]
+    for items in itertools.product(*header_coords_values):
+        message = messages.Message.fromsample(sample_name)
+        for key, value in grib_attributes.items():
+            try:
+                message[key] = value
+            except:
+                LOGGER.exception("Can't encode key: %r" % key)
+
+        for coord_name, coord_value in zip(header_coords_names, items):
+            message[coord_name] = coord_value
+
+        select = {n: v for n, v in zip(header_coords_names, items)}
+        message['values'] = data_var.sel(**select).values.flat[:].tolist()
+
+        message.write(file)
 
 
-def to_grib(dataset, path, mode='w'):
+def ecmwf_to_eccodes_flavor(
+        dataset, override_global_attributes={}, override_variables_attributes={},
+):
+    dataset.attrs.update(override_global_attributes)
+    for var_name, data_var in dataset.data_vars.items():
+        # TODO: actual translation logic, for example: detect shortName / paramId
+        data_var.attrs.update(override_variables_attributes.get(var_name, {}))
+
+    # TODO: translate coordinates, for example: time -> (dataDate, dataTime)
+    if 'endStep' in dataset.coords and not dataset.coords['endStep'].shape:
+        dataset = dataset.expand_dims('endStep')
+
+    return dataset
+
+
+def to_grib(dataset, path, mode='wb', **kwargs):
 
     # validate Dataset keys, DataArray names, and attr keys/values
     _validate_dataset_names(dataset)
     _validate_attrs(dataset)
 
-    store = WriteGribDataStore(path=path, mode=mode)
-
+    # translated CF conformant coordinates amd data variables to ecmwf CF flavor
+    # NOTE: only coordinates are translated at the moment.
     ecmwf_dataset = cfgrib.translate(dataset)
-    # this transformation is missing
-    eccodes_dataset = ecmwf_dataset
-    eccodes_dataset.dump_to_store(store)
+
+    # translated ecmwf CF flavor dataset to low-level eccodes flavor
+    eccodes_dataset = ecmwf_to_eccodes_flavor(ecmwf_dataset, **kwargs)
+    with open(path, mode=mode) as file:
+        for data_var in eccodes_dataset.data_vars.values():
+            eccodes_dataarray_to_grib(file, data_var, global_attributes=eccodes_dataset.attrs)
 
 
 def cfgrib2netcdf():
