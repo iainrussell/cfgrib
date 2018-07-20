@@ -48,6 +48,11 @@ class Message(collections.MutableMapping):
             raise EOFError("end-of-file reached.")
         return cls(codes_id=codes_id, **kwargs)
 
+    @classmethod
+    def fromsample(cls, sample_name, **kwargs):
+        codes_id = eccodes.codes_new_from_samples(sample_name.encode('ASCII'))
+        return cls(codes_id=codes_id, **kwargs)
+
     def __del__(self):
         eccodes.codes_handle_delete(self.codes_id)
 
@@ -114,6 +119,9 @@ class Message(collections.MutableMapping):
     def __len__(self):
         # type: () -> int
         return sum(1 for _ in self)
+
+    def write(self, file):
+        eccodes.codes_write(self.codes_id, file)
 
 
 @attr.attrs()
