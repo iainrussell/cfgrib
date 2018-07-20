@@ -623,7 +623,7 @@ def codes_set_array(msgid, key, values):
         if isinstance(values[0], float):
             codes_set_double_array(msgid, key, values)
         else:
-            raise NotImplementedError
+            raise NotImplementedError("Unsupported value type: %r" % type(values[0]))
     else:
         raise ValueError("Cannot provide an empty list.")
 
