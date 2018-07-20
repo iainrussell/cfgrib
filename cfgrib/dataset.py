@@ -85,6 +85,9 @@ VERTICAL_COORDINATE_MAP = [
 PLEV_COORDINATE_MAP = [
     ('air_pressure', False),  # NOTE: this supports mixed 'isobaricInPa' / 'isobaricInhPa'.
 ]
+
+TIME_KEYS = [b'dataDate', b'dataTime']
+
 DATA_TIME_COORDINATE_MAP = [
     ('dataDate', True),
     ('dataTime', True),
@@ -486,3 +489,25 @@ class Dataset(object):
         self.dimensions = dims  # type: T.Dict[str, T.Optional[int]]
         self.variables = vars  # type: T.Dict[str, Variable]
         self.attributes = attrs  # type: T.Dict[str, T.Any]
+
+
+def to_grib_date_time(datetime):
+    datetime_iso = str(datetime)
+    dataDate = float(datetime_iso[:10].replace('-', ''))
+    dataTime = float(datetime_iso[11:16].replace(':', ''))
+    return dataDate, dataTime
+
+
+def build_grib_date_time(dataset, keys=TIME_KEYS):
+    dataset = dataset.copy()
+    if TIME_KEYS in dataset.dims:
+        return dataset
+    if dataset['time'].size < 1:
+        dataset = dataset.expand_dims('time')
+
+    grib_date_time = np.array([to_grib_date_time(dt) for dt in dataset['time'].values]).T
+    grib_date_time_coordinates = dict(zip(TIME_KEYS, zip(['time'] * len(TIME_KEYS), grib_date_time)))
+    dataset.coords.update(grib_date_time_coordinates)
+    dataset = dataset.set_index(time=TIME_KEYS).unstack('time')
+
+    return dataset

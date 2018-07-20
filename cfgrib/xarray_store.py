@@ -206,29 +206,31 @@ def eccodes_dataarray_to_grib(file, data_var, global_attributes={}):
 
 
 def ecmwf_to_eccodes_flavor(
-        dataset, override_global_attributes={}, override_variables_attributes={},
+        ecmwf_dataset, override_global_attributes={}, override_variables_attributes={},
 ):
-    dataset.attrs.update(override_global_attributes)
-    for var_name, data_var in dataset.data_vars.items():
+    ecmwf_dataset.attrs.update(override_global_attributes)
+    for var_name, data_var in ecmwf_dataset.data_vars.items():
         # TODO: actual translation logic, for example: detect shortName / paramId
         data_var.attrs.update(override_variables_attributes.get(var_name, {}))
 
     # TODO: translate coordinates, for example: time -> (dataDate, dataTime)
-    if 'endStep' in dataset.coords and not dataset.coords['endStep'].shape:
-        dataset = dataset.expand_dims('endStep')
+    if 'time' in ecmwf_dataset.coords:
+        ecmwf_dataset = dataset.build_grib_date_time(ecmwf_dataset)
 
-    return dataset
+    if 'endStep' in ecmwf_dataset.coords and not ecmwf_dataset.coords['endStep'].shape:
+        ecmwf_dataset = ecmwf_dataset.expand_dims('endStep')
+
+    return ecmwf_dataset
 
 
-def to_grib(dataset, path, mode='wb', **kwargs):
-
+def to_grib(ecmwf_dataset, path, mode='wb', **kwargs):
     # validate Dataset keys, DataArray names, and attr keys/values
-    _validate_dataset_names(dataset)
-    _validate_attrs(dataset)
+    _validate_dataset_names(ecmwf_dataset)
+    _validate_attrs(ecmwf_dataset)
 
     # translated CF conformant coordinates amd data variables to ecmwf CF flavor
     # NOTE: only coordinates are translated at the moment.
-    ecmwf_dataset = cfgrib.translate(dataset)
+    ecmwf_dataset = cfgrib.translate(ecmwf_dataset)
 
     # translated ecmwf CF flavor dataset to low-level eccodes flavor
     eccodes_dataset = ecmwf_to_eccodes_flavor(ecmwf_dataset, **kwargs)
