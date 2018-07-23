@@ -78,7 +78,7 @@ FLAVOURS = {
             'topLevel': 'level',
         },
         'type_of_level_map': {
-            'hybrid': 'L{GRIB_hybrid_level_count}',
+            'hybrid': lambda attrs: 'L%d' % ((attrs['GRIB_NV'] - 2) // 2),
         },
     },
     'cds': {
@@ -91,7 +91,7 @@ FLAVOURS = {
             'topLevel': 'level',
         },
         'type_of_level_map': {
-            'hybrid': 'L{GRIB_hybrid_level_count}',
+            'hybrid': lambda attrs: 'L%d' % ((attrs['GRIB_NV'] - 2) // 2),
         },
     },
 }
@@ -116,6 +116,8 @@ class GribDataStore(AbstractDataStore):
             if self.ds.encode_vertical and 'GRIB_typeOfLevel' in var.attributes:
                 type_of_level = var.attributes['GRIB_typeOfLevel']
                 coord_name = self.type_of_level_map.get(type_of_level, type_of_level)
+                if isinstance(coord_name, T.Callable):
+                    coord_name = coord_name(var.attributes)
                 self.variable_map['topLevel'] = coord_name.format(**var.attributes)
 
     def open_store_variable(self, name, var):
