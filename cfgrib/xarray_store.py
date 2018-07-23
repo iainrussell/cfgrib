@@ -35,6 +35,7 @@ from xarray.backends.common import AbstractDataStore, BackendArray, AbstractWrit
 
 import cfgrib
 from . import dataset
+from . import eccodes
 from . import messages
 
 
@@ -193,8 +194,9 @@ def eccodes_dataarray_to_grib(file, data_var, global_attributes={}):
         for key, value in grib_attributes.items():
             try:
                 message[key] = value
-            except:
-                LOGGER.exception("Can't encode key: %r" % key)
+            except eccodes.EcCodesError as ex:
+                if ex.code != eccodes.lib.GRIB_READ_ONLY:
+                    LOGGER.exception("Can't encode key: %r" % key)
 
         for coord_name, coord_value in zip(header_coords_names, items):
             message[coord_name] = coord_value
