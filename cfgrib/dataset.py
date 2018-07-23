@@ -499,7 +499,7 @@ def to_grib_date_time(datetime):
 
 def build_grib_date_time(dataset, keys=TIME_KEYS):
     dataset = dataset.copy()
-    if TIME_KEYS in dataset.dims:
+    if set(TIME_KEYS).issubset(dataset.dims):
         return dataset
     if dataset['time'].size < 1:
         dataset = dataset.expand_dims('time')
